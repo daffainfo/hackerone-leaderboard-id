@@ -29,6 +29,7 @@ return nothing for those years.
 
 import argparse
 import csv
+import json
 import os
 import sys
 import time
@@ -91,8 +92,6 @@ class GraphQLError(RuntimeError):
 
 
 def post(query, variables, retries=5):
-    import json
-
     body = json.dumps({"query": query, "variables": variables}).encode()
     req = urllib.request.Request(
         ENDPOINT,
@@ -173,8 +172,11 @@ def rank(hackers):
     scored = [u for u in hackers.values() if (u.get("reputation") or 0) > 0]
     dropped = len(hackers) - len(scored)
 
-    # Tie-break on worldwide rank so ordering matches HackerOne's own.
-    scored.sort(key=lambda u: (-u["reputation"], u.get("rank") or 10**9, u["username"]))
+    # Tie-break on the immutable user id, never on worldwide rank. Worldwide rank
+    # drifts daily as hackers elsewhere earn points, which would reshuffle every
+    # tied cluster and make the daily diff claim ranks moved when nothing did.
+    # Ordering within a tie is arbitrary anyway - only stability matters here.
+    scored.sort(key=lambda u: (-u["reputation"], u.get("id") or "", u["username"]))
 
     rows = [
         {
@@ -242,6 +244,24 @@ def main():
         writer.writeheader()
         writer.writerows(rows)
     print(f"wrote {path} ({previous} -> {len(rows)} rows)", file=sys.stderr)
+
+    # The CSV deliberately carries no timestamp column - it would dirty the diff
+    # every day even when no rank moved. The site reads the date from here.
+    meta_path = os.path.join(args.out_dir, f"meta_{args.country}.json")
+    with open(meta_path, "w") as fh:
+        json.dump(
+            {
+                "country": args.country,
+                "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "ranked": len(rows),
+                "discovered": len(hackers),
+                "dropped_no_reputation": dropped,
+                "years_swept": [args.start, args.end],
+            },
+            fh,
+            indent=2,
+        )
+        fh.write("\n")
 
     for r in rows[:10]:
         print(

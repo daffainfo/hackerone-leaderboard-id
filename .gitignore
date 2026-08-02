@@ -2,7 +2,6 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
-
-# CSV under data/ is the deliverable and is committed; nothing else is.
-*.json
 *.log
+
+# data/ holds the published dataset (CSV) and its metadata; both are committed.

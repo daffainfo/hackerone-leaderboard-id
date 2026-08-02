@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Indonesia All-Time HackerOne Leaderboard</title>
+<meta name="description" content="Lifetime HackerOne reputation ranking for hackers in Indonesia, refreshed daily.">
+<script>
+  // Runs before first paint so a saved theme does not flash the other one.
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+  } catch (e) { /* private mode */ }
+</script>
+<style>
+  :root {
+    --bg: #fbfbfc;
+    --surface: #ffffff;
+    --border: #e4e4e8;
+    --text: #17171b;
+    --muted: #6b6b76;
+    --faint: #9a9aa5;
+    --accent: #d4183d;
+    --accent-soft: #fdeef1;
+    --gold: #b7791f;
+    --shadow: 0 1px 2px rgba(0,0,0,.05), 0 1px 12px rgba(0,0,0,.03);
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d0d10; --surface: #15151a; --border: #26262e; --text: #ececf1;
+      --muted: #9a9aa8; --faint: #6a6a78; --accent: #ff5c7a; --accent-soft: #2a1319;
+      --gold: #e0b04a; --shadow: 0 1px 2px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d0d10; --surface: #15151a; --border: #26262e; --text: #ececf1;
+    --muted: #9a9aa8; --faint: #6a6a78; --accent: #ff5c7a; --accent-soft: #2a1319;
+    --gold: #e0b04a; --shadow: 0 1px 2px rgba(0,0,0,.4);
+  }
+  :root[data-theme="light"] {
+    --bg: #fbfbfc; --surface: #ffffff; --border: #e4e4e8; --text: #17171b;
+    --muted: #6b6b76; --faint: #9a9aa5; --accent: #d4183d; --accent-soft: #fdeef1;
+    --gold: #b7791f; --shadow: 0 1px 2px rgba(0,0,0,.05), 0 1px 12px rgba(0,0,0,.03);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 40px 20px 80px; }
+
+  header {
+    margin-bottom: 28px; display: flex; align-items: flex-start;
+    justify-content: space-between; gap: 16px;
+  }
+  #theme {
+    flex: none; background: var(--surface); border: 1px solid var(--border);
+    color: var(--muted); border-radius: 8px; width: 34px; height: 34px;
+    font-size: 15px; line-height: 1; cursor: pointer; padding: 0;
+  }
+  #theme:hover { color: var(--text); border-color: var(--faint); }
+  h1 {
+    margin: 0 0 6px; font-size: 27px; letter-spacing: -.021em; font-weight: 650; line-height: 1.2;
+  }
+  .sub { color: var(--muted); font-size: 14px; margin: 0; }
+  .sub .dot { color: var(--faint); margin: 0 7px; }
+
+  .stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px; margin: 24px 0;
+  }
+  .stat {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; box-shadow: var(--shadow);
+  }
+  .stat .k {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--faint); font-weight: 600;
+  }
+  .stat .v {
+    font-size: 23px; font-weight: 620; margin-top: 3px; letter-spacing: -.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat .v small { font-size: 13px; font-weight: 500; color: var(--muted); }
+
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+  #q {
+    flex: 1; min-width: 200px; padding: 9px 13px; font-size: 14px; font-family: inherit;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); outline: none;
+  }
+  #q:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  #count { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+
+  .tablecard {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 11px; box-shadow: var(--shadow); overflow: hidden;
+  }
+  .scroller { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { padding: 10px 14px; text-align: left; white-space: nowrap; }
+  thead th {
+    position: sticky; top: 0; background: var(--surface); z-index: 1;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px; text-transform: uppercase; letter-spacing: .055em;
+    color: var(--faint); font-weight: 600; cursor: pointer; user-select: none;
+  }
+  thead th:hover { color: var(--text); }
+  thead th .arrow { opacity: 0; margin-left: 4px; font-size: 9px; }
+  thead th[aria-sort] { color: var(--text); }
+  thead th[aria-sort] .arrow { opacity: 1; }
+  tbody tr { border-top: 1px solid var(--border); }
+  tbody tr:first-child { border-top: 0; }
+  tbody tr:hover { background: var(--accent-soft); }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .rank { font-variant-numeric: tabular-nums; color: var(--muted); width: 1%; font-weight: 550; }
+  .top1, .top2, .top3 { color: var(--gold); font-weight: 700; }
+  .user a { color: var(--text); text-decoration: none; font-weight: 550; }
+  .user a:hover { color: var(--accent); text-decoration: underline; }
+  .pts { font-weight: 600; }
+  .dim { color: var(--faint); }
+  .biz {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .05em; font-weight: 650;
+    color: var(--muted); border: 1px solid var(--border); border-radius: 4px;
+    padding: 1px 4px; margin-left: 6px; vertical-align: 1px;
+  }
+  .empty, .loading { padding: 44px 20px; text-align: center; color: var(--muted); }
+  .err { color: var(--accent); }
+
+  footer {
+    margin-top: 30px; color: var(--muted); font-size: 13px; line-height: 1.65;
+  }
+  footer h2 { font-size: 13px; margin: 0 0 6px; color: var(--text); font-weight: 620; }
+  footer p { margin: 0 0 12px; }
+  footer code {
+    font-family: var(--mono); font-size: 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 4px; padding: 1px 4px;
+  }
+  footer a { color: var(--accent); }
+
+  @media (max-width: 600px) {
+    .wrap { padding: 26px 14px 60px; }
+    h1 { font-size: 22px; }
+    table { font-size: 13px; }
+    th, td { padding: 9px 8px; }
+    /* Drop the secondary metrics so rank, hacker, points and world rank all
+       fit without sideways scrolling. The scroller still handles overflow. */
+    .hide-sm, .hide-xs { display: none; }
+    #q { min-width: 0; }
+    #count { flex-basis: 100%; }
+    /* Usernames run to 30 characters; without a cap their min-content width
+       pushes the table past the card and the points column falls off. */
+    td.user { max-width: 44vw; }
+    td.user a {
+      display: inline-block; max-width: 100%; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>Indonesia All-Time HackerOne Leaderboard</h1>
+      <p class="sub">
+        Ranked by lifetime reputation<span class="dot">·</span><span id="updated">loading…</span>
+      </p>
+    </div>
+    <button id="theme" type="button" title="Toggle theme" aria-label="Toggle colour theme"></button>
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="toolbar">
+    <input id="q" type="search" placeholder="Search username…" autocomplete="off" spellcheck="false">
+    <span id="count"></span>
+  </div>
+
+  <div class="tablecard">
+    <div class="scroller">
+      <table>
+        <thead>
+          <tr>
+            <th data-k="country_rank" data-t="n">#<span class="arrow">▼</span></th>
+            <th data-k="username" data-t="s">Hacker<span class="arrow">▼</span></th>
+            <th data-k="reputation" data-t="n" class="num">Points<span class="arrow">▼</span></th>
+            <th data-k="worldwide_rank" data-t="n" class="num">World<span class="arrow">▼</span></th>
+            <th data-k="resolved_reports" data-t="n" class="num hide-xs">Reports<span class="arrow">▼</span></th>
+            <th data-k="signal" data-t="n" class="num hide-sm">Signal<span class="arrow">▼</span></th>
+            <th data-k="impact" data-t="n" class="num hide-sm">Impact<span class="arrow">▼</span></th>
+          </tr>
+        </thead>
+        <tbody id="rows">
+          <tr><td colspan="7" class="loading">Loading leaderboard…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>
+    <h2>How this is built</h2>
+    <p>
+      HackerOne publishes no all-time per-country leaderboard, so this one is reconstructed.
+      <code>ALL_TIME_REPUTATION</code> is capped at the global top 100 and ignores the country
+      filter, and <code>HIGHEST_REPUTATION_BY_COUNTRY</code> requires a year. But every
+      leaderboard entry embeds the hacker's <em>lifetime</em> reputation and worldwide rank —
+      so the work is finding every Indonesian hacker, not ranking them. A daily job sweeps
+      every dated country board from 2020 onward, annually and per quarter, then dedupes and
+      sorts by lifetime points.
+    </p>
+    <p>
+      Hackers with no reputation are excluded, as are accounts that no longer exist. A hacker
+      who earned points only before 2020 and has not placed on a country board since cannot be
+      discovered — those boards return nothing for earlier years. A blank world rank means the
+      hacker sits below HackerOne's global ranking cutoff.
+    </p>
+    <p class="dim">
+      Unofficial and not affiliated with HackerOne. Built from public data.
+    </p>
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  var DATA = 'data/leaderboard_ID.csv';
+  var META = 'data/meta_ID.json';
+
+  var rows = [], view = [], sortKey = 'country_rank', sortDir = 1;
+  var tbody = document.getElementById('rows');
+  var countEl = document.getElementById('count');
+
+  // Minimal RFC4180 parser: handles quoted fields and embedded commas/quotes.
+  function parseCSV(text) {
+    var out = [], row = [], field = '', quoted = false, i = 0;
+    text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    while (i < text.length) {
+      var c = text[i];
+      if (quoted) {
+        if (c === '"') {
+          if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+          quoted = false; i++; continue;
+        }
+        field += c; i++; continue;
+      }
+      if (c === '"') { quoted = true; i++; continue; }
+      if (c === ',') { row.push(field); field = ''; i++; continue; }
+      if (c === '\n') { row.push(field); out.push(row); row = []; field = ''; i++; continue; }
+      field += c; i++;
+    }
+    if (field !== '' || row.length) { row.push(field); out.push(row); }
+    if (!out.length) return [];
+    var head = out.shift();
+    return out.filter(function (r) { return r.length === head.length; })
+      .map(function (r) {
+        var o = {};
+        head.forEach(function (h, j) { o[h] = r[j]; });
+        return o;
+      });
+  }
+
+  function num(v) {
+    if (v === '' || v == null) return null;
+    var n = Number(v);
+    return isNaN(n) ? null : n;
+  }
+  function fmt(n) { return n == null ? '—' : n.toLocaleString('en-US'); }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function render() {
+    if (!view.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">No hacker matches that search.</td></tr>';
+      countEl.textContent = '0 of ' + rows.length;
+      return;
+    }
+    var html = view.map(function (r) {
+      var rank = r.country_rank;
+      var cls = rank <= 3 ? ' top' + rank : '';
+      var badge = r.user_type === 'business' ? '<span class="biz">team</span>' : '';
+      return '<tr>'
+        + '<td class="rank' + cls + '">' + rank + '</td>'
+        + '<td class="user"><a href="' + esc(r.profile) + '" target="_blank" rel="noopener noreferrer">'
+          + esc(r.username) + '</a>' + badge + '</td>'
+        + '<td class="num pts">' + fmt(r.reputation) + '</td>'
+        + '<td class="num' + (r.worldwide_rank == null ? ' dim' : '') + '">'
+          + (r.worldwide_rank == null ? '—' : '#' + fmt(r.worldwide_rank)) + '</td>'
+        + '<td class="num hide-xs">' + fmt(r.resolved_reports) + '</td>'
+        + '<td class="num hide-sm">' + (r.signal == null ? '—' : r.signal.toFixed(2)) + '</td>'
+        + '<td class="num hide-sm">' + (r.impact == null ? '—' : r.impact.toFixed(2)) + '</td>'
+        + '</tr>';
+    }).join('');
+    tbody.innerHTML = html;
+    countEl.textContent = view.length === rows.length
+      ? rows.length.toLocaleString('en-US') + ' hackers'
+      : view.length.toLocaleString('en-US') + ' of ' + rows.length.toLocaleString('en-US');
+  }
+
+  function apply() {
+    var q = document.getElementById('q').value.trim().toLowerCase();
+    view = q ? rows.filter(function (r) { return r.username.toLowerCase().indexOf(q) !== -1; })
+             : rows.slice();
+    view.sort(function (a, b) {
+      var x = a[sortKey], y = b[sortKey];
+      // Missing values always sink, regardless of direction.
+      if (x == null && y == null) return a.country_rank - b.country_rank;
+      if (x == null) return 1;
+      if (y == null) return -1;
+      if (typeof x === 'string') return sortDir * x.localeCompare(y);
+      return sortDir * (x - y);
+    });
+    render();
+  }
+
+  function stats() {
+    var pts = 0, reps = 0;
+    rows.forEach(function (r) { pts += r.reputation || 0; reps += r.resolved_reports || 0; });
+    var inTop1k = rows.filter(function (r) {
+      return r.worldwide_rank != null && r.worldwide_rank <= 1000;
+    }).length;
+    var cards = [
+      ['Hackers ranked', fmt(rows.length), ''],
+      ['Total points', fmt(pts), ''],
+      ['Resolved reports', fmt(reps), ''],
+      ['In world top 1000', fmt(inTop1k), '']
+    ];
+    document.getElementById('stats').innerHTML = cards.map(function (c) {
+      return '<div class="stat"><div class="k">' + c[0] + '</div><div class="v">' + c[1]
+        + (c[2] ? ' <small>' + c[2] + '</small>' : '') + '</div></div>';
+    }).join('');
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('thead th'), function (th) {
+    th.addEventListener('click', function () {
+      var k = th.dataset.k;
+      if (sortKey === k) {
+        sortDir = -sortDir;
+      } else {
+        sortKey = k;
+        // Ranks read best ascending; every other measure best descending.
+        sortDir = (k === 'country_rank' || k === 'worldwide_rank' || k === 'username') ? 1 : -1;
+      }
+      Array.prototype.forEach.call(document.querySelectorAll('thead th'), function (o) {
+        o.removeAttribute('aria-sort');
+      });
+      th.setAttribute('aria-sort', sortDir === 1 ? 'ascending' : 'descending');
+      th.querySelector('.arrow').textContent = sortDir === 1 ? '▲' : '▼';
+      apply();
+    });
+  });
+
+  document.getElementById('q').addEventListener('input', apply);
+
+  // Theme: follow the OS until the reader overrides it, then remember that.
+  var themeBtn = document.getElementById('theme');
+  function systemDark() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  function paintTheme() {
+    var set = document.documentElement.getAttribute('data-theme');
+    var dark = set ? set === 'dark' : systemDark();
+    themeBtn.textContent = dark ? '☀' : '☾';
+  }
+  themeBtn.addEventListener('click', function () {
+    var set = document.documentElement.getAttribute('data-theme');
+    var dark = set ? set === 'dark' : systemDark();
+    var next = dark ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch (e) { /* private mode */ }
+    paintTheme();
+  });
+  paintTheme();
+
+  fetch(DATA, { cache: 'no-cache' })
+    .then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.text();
+    })
+    .then(function (text) {
+      rows = parseCSV(text).map(function (r) {
+        return {
+          country_rank: num(r.country_rank),
+          username: r.username,
+          reputation: num(r.reputation),
+          worldwide_rank: num(r.worldwide_rank),
+          resolved_reports: num(r.resolved_reports),
+          signal: num(r.signal),
+          impact: num(r.impact),
+          user_type: r.user_type,
+          profile: r.profile
+        };
+      }).filter(function (r) { return r.username; });
+      stats();
+      apply();
+    })
+    .catch(function (e) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty err">Could not load '
+        + esc(DATA) + ' (' + esc(e.message) + ').</td></tr>';
+    });
+
+  fetch(META, { cache: 'no-cache' })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (m) {
+      if (!m || !m.generated_at) throw new Error('no meta');
+      var d = new Date(m.generated_at);
+      document.getElementById('updated').textContent = 'Updated ' + d.toLocaleDateString(undefined, {
+        year: 'numeric', month: 'short', day: 'numeric'
+      });
+    })
+    .catch(function () { document.getElementById('updated').textContent = 'Updated daily'; });
+})();
+</script>
+</body>
+</html>
