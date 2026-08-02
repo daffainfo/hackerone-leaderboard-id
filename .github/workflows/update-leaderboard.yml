@@ -1,0 +1,58 @@
+name: Update leaderboard
+
+on:
+  schedule:
+    # 01:00 UTC = 08:00 WIB. GitHub runs cron late under load; this is not exact.
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+    inputs:
+      country:
+        description: "ISO 3166-1 alpha-2 country code"
+        default: "ID"
+        required: false
+
+permissions:
+  contents: write
+
+# Never let two runs race on the same commit.
+concurrency:
+  group: update-leaderboard
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Scrape leaderboard
+        # Via env, not direct interpolation, so the input cannot inject shell.
+        env:
+          COUNTRY: ${{ github.event.inputs.country || 'ID' }}
+        run: python scripts/scrape.py --country "$COUNTRY" --out-dir data
+
+      - name: Commit if changed
+        env:
+          COUNTRY: ${{ github.event.inputs.country || 'ID' }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --staged --quiet; then
+            echo "No change today."
+            exit 0
+          fi
+          git commit -m "data: $COUNTRY leaderboard $(date -u +%Y-%m-%d)"
+          # A concurrent commit is the only expected push failure; rebase and retry.
+          for attempt in 1 2 3; do
+            if git push; then exit 0; fi
+            git pull --rebase --autostash
+          done
+          echo "push failed after 3 attempts" >&2
+          exit 1
